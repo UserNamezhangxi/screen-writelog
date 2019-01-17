@@ -2,36 +2,31 @@ package com.example.administrator.battery;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.arch.lifecycle.Observer;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.BatteryManager;
-import android.os.PowerManager;
-import android.provider.Settings;
-import android.support.annotation.NonNull;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
+import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
 
-import com.yanzhenjie.permission.AndPermission;
-import com.yanzhenjie.permission.PermissionListener;
-import com.yanzhenjie.permission.Rationale;
-import com.yanzhenjie.permission.RationaleListener;
-
-import java.io.File;
 import java.io.IOException;
 import java.util.Calendar;
-import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback{
     private static final String TAG = "MainActivity";
 
-    private static final int REQUEST_CODE_SETTING = 300;
+    private static final int CODE_MULTI_PERMISSION = 300;
+
+    public static final String PERMISSION_READ_EXTERNAL_STORAGE = Manifest.permission.READ_EXTERNAL_STORAGE;
+    public static final String PERMISSION_WRITE_EXTERNAL_STORAGE = Manifest.permission.WRITE_EXTERNAL_STORAGE;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -52,40 +47,13 @@ public class MainActivity extends AppCompatActivity {
         filter.addAction(Intent.ACTION_SCREEN_ON);
 
         registerReceiver(mIntentReceiver, filter);
-        //requestPremission();
+
+        requestMultiPermissions(MainActivity.this,new String[]{
+                PERMISSION_READ_EXTERNAL_STORAGE,
+                PERMISSION_WRITE_EXTERNAL_STORAGE});
     }
 
-    public void requestPremission(){
-        AndPermission.with(this)
-                .permission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                .callback(permissionListener)
-                .rationale(new RationaleListener() {
-                    @Override
-                    public void showRequestPermissionRationale(int requestCode, Rationale rationale) {
-                       // FileUtil.createFile();
-                    }
-                })
-                .start();
-
-    }
-
-    private PermissionListener permissionListener = new PermissionListener() {
-        @Override
-        public void onSucceed(int requestCode, @NonNull List<String> grantPermissions) {
-            FileUtil.createFile();
-            Toast.makeText(MainActivity.this, "申请成功", Toast.LENGTH_SHORT).show();
-        }
-
-        @Override
-        public void onFailed(int requestCode, @NonNull List<String> deniedPermissions) {
-            // 用户否勾选了不再提示并且拒绝了权限，那么提示用户到设置中授权。
-            if (AndPermission.hasAlwaysDeniedPermission(MainActivity.this, deniedPermissions)) {
-                // 第一种：用默认的提示语。
-                AndPermission.defaultSettingDialog(MainActivity.this, REQUEST_CODE_SETTING).show();
-            }
-        }
-    };
-
+    /*接受屏幕亮灭的广播接收*/
     private BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
 
         @Override
@@ -112,7 +80,7 @@ public class MainActivity extends AppCompatActivity {
     };
 
     private String getTimeString(){
-        String time = "1970-01-01-00-00-00";
+        String time = "";
         Calendar cal = Calendar.getInstance();
         String year = java.lang.String.valueOf(cal.get(Calendar.YEAR));
         String month = java.lang.String.valueOf(cal.get(Calendar.MONTH))+1;
@@ -131,4 +99,41 @@ public class MainActivity extends AppCompatActivity {
         time = year+"-"+month+"-"+day+"-"+hour+"-"+minute+"-"+second;
         return time;
     }
+
+
+    /**
+     * 一次申请多个权限
+     */
+    public static void requestMultiPermissions(final Activity activity,String[] permission) {
+
+        if (null != permission && permission.length > 0) {
+            ActivityCompat.requestPermissions(activity, permission, CODE_MULTI_PERMISSION);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        Log.d(TAG,"requestCode="+requestCode+","+permissions.length+","+grantResults.length);
+        if (requestCode == CODE_MULTI_PERMISSION) {
+            requestMultiResult( permissions, grantResults);
+            return;
+        }
+    }
+
+
+    private void requestMultiResult( String[] permissions, int[] grantResults) {
+
+        for (int i = 0; i < permissions.length; i++) {
+            Log.d(TAG, "permissions: [i]:" + i + ", permissions[i]" + permissions[i] + ",grantResults[i]:" + grantResults[i]);
+            if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
+                if (TextUtils.equals(permissions[i] ,PERMISSION_READ_EXTERNAL_STORAGE) ||
+                        TextUtils.equals(permissions[i] ,PERMISSION_WRITE_EXTERNAL_STORAGE) ){
+                    Toast.makeText(MainActivity.this,"sd 读写好了！",Toast.LENGTH_LONG).show();
+                    FileUtil.createFile();
+                }
+            }
+        }
+    }
+
 }
